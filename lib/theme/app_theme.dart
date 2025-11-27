@@ -3,49 +3,74 @@ import 'package:flutter/material.dart';
 class AppTheme {
   static ThemeData theme = ThemeData(
     useMaterial3: true,
-    colorSchemeSeed: Colors.indigo,
     brightness: Brightness.light,
-    scaffoldBackgroundColor: const Color(0xFFF4F6FB),
+
+    // Paleta moderna (cor base dinâmica)
+    colorSchemeSeed: const Color(0xFF4C6FFF),
+
+    scaffoldBackgroundColor: const Color(0xFFF3F4F8),
+
+    fontFamily: "Inter",
+
     appBarTheme: const AppBarTheme(
-      centerTitle: true,
-      elevation: 0,
       backgroundColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: true,
       titleTextStyle: TextStyle(
-        color: Colors.black87,
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: FontWeight.w700,
+        color: Color(0xFF1A1C1E),
       ),
-      iconTheme: IconThemeData(color: Colors.black87),
+      iconTheme: IconThemeData(color: Color(0xFF1A1C1E)),
     ),
-    
+
+    // Estilo de card ultramoderno (Glass)
+    cardTheme: CardThemeData(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+
+      color: const Color.fromRGBO(255, 255, 255, 0.75),
+
+      shadowColor: const Color.fromRGBO(0, 0, 0, 0.07),
+      surfaceTintColor: Colors.transparent,
+    ),
+
+    // Botões com design de 2025
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        backgroundColor: const Color(0xFF4C6FFF),
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
         ),
-        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.2,
+        ),
       ),
     ),
+
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide.none,
       ),
-      hintStyle: TextStyle(color: Colors.grey.shade500),
-    ),
-    listTileTheme: ListTileThemeData(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+
+      hintStyle: TextStyle(
+        color: Colors.grey.shade500,
+        fontSize: 15,
       ),
-      tileColor: Colors.white,
-      selectedTileColor: Colors.indigo.shade50,
-      iconColor: Colors.indigo.shade700,
     ),
   );
 }

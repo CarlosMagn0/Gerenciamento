@@ -1,5 +1,6 @@
 class Produto {
   String nome;
+  String categoria;
   double precoCompra;
   double precoVenda;
   int estoque;
@@ -7,6 +8,7 @@ class Produto {
 
   Produto({
     required this.nome,
+    required this.categoria,
     required this.precoCompra,
     required this.precoVenda,
     this.estoque = 0,
@@ -14,9 +16,5 @@ class Produto {
   });
 
   double get lucroUnitario => precoVenda - precoCompra;
-  double get lucroTotal => lucroUnitario * vendidos;
-
-  // Backwards-compatible aliases (if other code used `compra`/`venda`)
-  double get compra => precoCompra;
-  double get venda => precoVenda;
+  double get lucroTotal   => lucroUnitario * vendidos;
 }
