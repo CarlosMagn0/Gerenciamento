@@ -23,14 +23,14 @@ class _DetalhesProdutoPageState extends State<DetalhesProdutoPage> {
         widget.produto.vendidos++;
       });
 
-      widget.atualizar(); // Atualiza lista principal
+      widget.atualizar();
 
       if (widget.produto.estoque <= 2) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               "⚠ Estoque de ${widget.produto.nome} está acabando!",
-              style: TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16),
             ),
             backgroundColor: Colors.orange.shade700,
           ),
@@ -39,7 +39,7 @@ class _DetalhesProdutoPageState extends State<DetalhesProdutoPage> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
+          content: const Text(
             "❌ Não há estoque para vender!",
             style: TextStyle(fontSize: 16),
           ),
@@ -54,70 +54,178 @@ class _DetalhesProdutoPageState extends State<DetalhesProdutoPage> {
     final p = widget.produto;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF6F7FB),
+
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.black,
         title: Text(
           p.nome,
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
+
+      // BOTÃO FIXO EMBAIXO (CTA)
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          height: 56,
+          child: ElevatedButton.icon(
+            onPressed: vender,
+            icon: const Icon(Icons.shopping_cart_checkout_rounded),
+            label: const Text("Registrar venda"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
         ),
       ),
 
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // CARD DE INFORMAÇÕES DO PRODUTO
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Preço de compra:",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text("R\$ ${p.precoCompra.toStringAsFixed(2)}"),
-
-                    SizedBox(height: 12),
-
-                    Text("Preço de venda:",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text("R\$ ${p.precoVenda.toStringAsFixed(2)}"),
-
-                    SizedBox(height: 12),
-
-                    Text("Lucro por unidade:",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text("R\$ ${p.lucroUnitario.toStringAsFixed(2)}"),
-
-                    SizedBox(height: 12),
-
-                    Text("Estoque atual:",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text("${p.estoque} unidades"),
-                  ],
+            /// CARD PRINCIPAL — LUCRO
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6A5AE0), Color(0xFF8F7CFF)],
                 ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Lucro por unidade",
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "R\$ ${p.lucroUnitario.toStringAsFixed(2)}",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            SizedBox(height: 30),
+            const SizedBox(height: 20),
 
-            // BOTÃO DE VENDA
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: vender,
-                icon: Icon(Icons.shopping_cart_checkout_rounded),
-                label: const Text("Registrar venda"),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: TextStyle(fontSize: 18),
-                ),
+            /// GRID DE INFORMAÇÕES
+            GridView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.2,
               ),
-            )
+              children: [
+
+                _InfoCard(
+                  title: "Compra",
+                  value: "R\$ ${p.precoCompra.toStringAsFixed(2)}",
+                  icon: Icons.arrow_downward_rounded,
+                  color: Colors.orange,
+                ),
+
+                _InfoCard(
+                  title: "Venda",
+                  value: "R\$ ${p.precoVenda.toStringAsFixed(2)}",
+                  icon: Icons.arrow_upward_rounded,
+                  color: Colors.green,
+                ),
+
+                _InfoCard(
+                  title: "Estoque",
+                  value: "${p.estoque}",
+                  icon: Icons.inventory_2_rounded,
+                  color: p.estoque <= 2 ? Colors.red : Colors.blue,
+                ),
+
+                _InfoCard(
+                  title: "Vendidos",
+                  value: "${p.vendidos}",
+                  icon: Icons.trending_up_rounded,
+                  color: Colors.purple,
+                ),
+              ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _InfoCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: color.withOpacity(0.15),
+            child: Icon(icon, color: color),
+          ),
+          const Spacer(),
+          Text(
+            title,
+            style: const TextStyle(color: Colors.black54),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
