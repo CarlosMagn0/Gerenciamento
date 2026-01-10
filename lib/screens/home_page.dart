@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
 import '../models/produto.dart';
+import '../produto_repository.dart';
 import '../widgets/product_card.dart';
 import 'novo_produto_page.dart';
 import 'estatisticas_page.dart';
@@ -13,31 +16,14 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final List<Produto> produtos = [];
+  final ProdutoRepository repo = ProdutoRepository();
 
   String _search = '';
   String _sort = 'Mais vendidos';
   String? _filterCategoria;
 
-  // ================== DADOS ==================
-  double get receitaTotal =>
-      produtos.fold(0, (s, p) => s + p.precoVenda * p.vendidos);
-
-  double get lucroTotal =>
-      produtos.fold(0, (s, p) => s + p.lucroTotal);
-
-  int get totalEstoque =>
-      produtos.fold(0, (s, p) => s + p.estoque);
-
-  List<String> get categorias {
-    final set = <String>{};
-    for (var p in produtos) {
-      set.add(p.categoria);
-    }
-    return ['Todas', ...set];
-  }
-
-  List<Produto> get produtosFiltrados {
+  // ================== HELPERS ==================
+  List<Produto> _filtrar(List<Produto> produtos) {
     var list = [...produtos];
 
     if (_search.isNotEmpty) {
@@ -46,7 +32,7 @@ class _HomePageState extends State<HomePage> {
           p.categoria.toLowerCase().contains(_search.toLowerCase())).toList();
     }
 
-    if (_filterCategoria != null && _filterCategoria != 'Todas') {
+    if (_filterCategoria != null) {
       list = list.where((p) => p.categoria == _filterCategoria).toList();
     }
 
@@ -61,19 +47,6 @@ class _HomePageState extends State<HomePage> {
     return list;
   }
 
-  // ================== AÇÕES ==================
-  void adicionarProduto(Produto p) => setState(() => produtos.add(p));
-  void removerProduto(Produto p) => setState(() => produtos.remove(p));
-
-  void venderProduto(Produto p) {
-    if (p.estoque > 0) {
-      setState(() {
-        p.estoque--;
-        p.vendidos++;
-      });
-    }
-  }
-
   // ================== UI ==================
   @override
   Widget build(BuildContext context) {
@@ -83,73 +56,110 @@ class _HomePageState extends State<HomePage> {
         onPressed: () async {
           final res = await Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => NovoProdutoPage()),
+            MaterialPageRoute(builder: (_) => const NovoProdutoPage()),
           );
-          if (res is Produto) adicionarProduto(res);
+          if (res is Produto) {
+            await repo.adicionar(res);
+          }
         },
         child: const Icon(Icons.add),
       ),
-      body: CustomScrollView(
-        slivers: [
-          _buildHeader(),
-          SliverToBoxAdapter(child: _buildKpis()),
-          SliverToBoxAdapter(child: _buildFilters()),
-          produtosFiltrados.isEmpty
-              ? SliverFillRemaining(child: _emptyState())
-              : SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  sliver: SliverGrid(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) {
-                        final p = produtosFiltrados[i];
-                        return ProductCard(
-                          produto: p,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => DetalhesProdutoPage(
-                                  produto: p,
-                                  atualizar: () => setState(() {}),
-                                ),
-                              ),
+      body: ValueListenableBuilder(
+        valueListenable: Hive.box<Produto>('produtosBox').listenable(),
+        builder: (context, Box<Produto> box, _) {
+          final produtos = box.values.toList();
+          final filtrados = _filtrar(produtos);
+
+          final receitaTotal =
+              produtos.fold(0.0, (s, p) => s + p.precoVenda * p.vendidos);
+          final lucroTotal =
+              produtos.fold(0.0, (s, p) => s + p.lucroTotal);
+          final estoqueTotal =
+              produtos.fold(0, (s, p) => s + p.estoque);
+
+          final categorias = {
+            'Todas',
+            ...produtos.map((p) => p.categoria)
+          }.toList();
+
+          return CustomScrollView(
+            slivers: [
+              _buildHeader(receitaTotal, lucroTotal, produtos),
+              SliverToBoxAdapter(
+                child: _buildKpis(produtos.length, estoqueTotal),
+              ),
+              SliverToBoxAdapter(
+                child: _buildFilters(categorias),
+              ),
+              filtrados.isEmpty
+                  ? SliverFillRemaining(child: _emptyState())
+                  : SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverGrid(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                            final p = filtrados[i];
+                            final index = produtos.indexOf(p);
+
+                            return ProductCard(
+                              produto: p,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => DetalhesProdutoPage(
+                                      produto: p,
+                                      atualizar: () =>
+                                          repo.atualizar(index, p),
+                                    ),
+                                  ),
+                                );
+                              },
+                              onSell: () async {
+                                if (p.estoque > 0) {
+                                  p.estoque--;
+                                  p.vendidos++;
+                                  await repo.atualizar(index, p);
+                                }
+                              },
+                              onDelete: () async {
+                                await repo.remover(index);
+                              },
+                              onEdit: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => NovoProdutoPage(produto: p),
+                                  ),
+                                );
+                                await repo.atualizar(index, p);
+                              },
                             );
                           },
-                          onSell: () => venderProduto(p),
-                          onDelete: () => removerProduto(p),
-                          onEdit: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => NovoProdutoPage(),
-                              ),
-                            );
-                            setState(() {});
-                          },
-                        );
-                      },
-                      childCount: produtosFiltrados.length,
+                          childCount: filtrados.length,
+                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 14,
+                          crossAxisSpacing: 14,
+                          childAspectRatio: 0.78,
+                        ),
+                      ),
                     ),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: 0.78,
-                    ),
-                  ),
-                ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
 
   // ================== HEADER ==================
-  SliverAppBar _buildHeader() {
+  SliverAppBar _buildHeader(
+      double receita, double lucro, List<Produto> produtos) {
     return SliverAppBar(
-      expandedHeight: 230,
+      expandedHeight: 220,
       pinned: true,
-      elevation: 0,
       backgroundColor: Colors.transparent,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
@@ -157,30 +167,27 @@ class _HomePageState extends State<HomePage> {
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0xFF6A5AE0), Color(0xFF8F7CFF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Gerenciador de Loja",
-                style: TextStyle(color: Colors.white70),
-              ),
+              const Text("Visão geral",
+                  style: TextStyle(color: Colors.white70)),
               const SizedBox(height: 6),
-              const Text(
-                "Visão geral",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _searchField(),
+              Text("Produtos: ${produtos.length}",
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold)),
               const Spacer(),
-              _headerTotals(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _headerValue("Receita", receita),
+                  _headerValue("Lucro", lucro),
+                ],
+              )
             ],
           ),
         ),
@@ -192,7 +199,8 @@ class _HomePageState extends State<HomePage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => EstatisticasPage(produtos: produtos),
+                builder: (_) =>
+                    EstatisticasPage(produtos: produtos),
               ),
             );
           },
@@ -201,113 +209,58 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _searchField() {
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.search, color: Colors.grey),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Buscar produto ou categoria',
-                border: InputBorder.none,
-              ),
-              onChanged: (v) => setState(() => _search = v),
-            ),
-          ),
-          if (_search.isNotEmpty)
-            GestureDetector(
-              onTap: () => setState(() => _search = ''),
-              child: const Icon(Icons.close, size: 18),
-            )
-        ],
-      ),
-    );
-  }
-
-  Widget _headerTotals() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _headerValue("Receita", receitaTotal),
-          _headerValue("Lucro", lucroTotal),
-        ],
-      ),
-    );
-  }
-
   Widget _headerValue(String label, double value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(color: Colors.white70)),
-        const SizedBox(height: 6),
         Text(
           "R\$ ${value.toStringAsFixed(2)}",
           style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18),
         ),
       ],
     );
   }
 
   // ================== KPIs ==================
-  Widget _buildKpis() {
+  Widget _buildKpis(int total, int estoque) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          _kpiCard("Produtos", produtos.length.toString(), Icons.shopping_bag),
+          _kpi("Produtos", total.toString(), Icons.shopping_bag),
           const SizedBox(width: 12),
-          _kpiCard("Estoque", totalEstoque.toString(), Icons.inventory),
+          _kpi("Estoque", estoque.toString(), Icons.inventory),
         ],
       ),
     );
   }
 
-  Widget _kpiCard(String title, String value, IconData icon) {
+  Widget _kpi(String t, String v, IconData i) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
+            color: Colors.white, borderRadius: BorderRadius.circular(16)),
         child: Row(
           children: [
             CircleAvatar(
               backgroundColor: const Color(0xFF6A5AE0),
-              child: Icon(icon, color: Colors.white),
+              child: Icon(i, color: Colors.white),
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
-                ),
+                Text(t, style: const TextStyle(color: Colors.grey)),
+                Text(v,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
               ],
-            ),
+            )
           ],
         ),
       ),
@@ -315,7 +268,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ================== FILTROS ==================
-  Widget _buildFilters() {
+  Widget _buildFilters(List<String> categorias) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
@@ -326,46 +279,45 @@ class _HomePageState extends State<HomePage> {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: categorias.map((c) {
-                  final selected = (_filterCategoria ?? 'Todas') == c;
+                  final selected =
+                      (_filterCategoria ?? 'Todas') == c;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
                       label: Text(c),
                       selected: selected,
-                      onSelected: (_) =>
-                          setState(() => _filterCategoria = c == 'Todas' ? null : c),
+                      onSelected: (_) => setState(() =>
+                          _filterCategoria =
+                              c == 'Todas' ? null : c),
                     ),
                   );
                 }).toList(),
               ),
             ),
           ),
-          const SizedBox(width: 8),
           DropdownButton<String>(
             value: _sort,
             underline: const SizedBox(),
             items: ['Mais vendidos', 'Maior lucro', 'A - Z']
-                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                .map((s) =>
+                    DropdownMenuItem(value: s, child: Text(s)))
                 .toList(),
             onChanged: (v) => setState(() => _sort = v!),
-          ),
+          )
         ],
       ),
     );
   }
 
-  // ================== EMPTY ==================
   Widget _emptyState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           Icon(Icons.inbox, size: 72, color: Colors.grey),
           SizedBox(height: 12),
-          Text(
-            "Nenhum produto encontrado",
-            style: TextStyle(color: Colors.grey),
-          ),
+          Text("Nenhum produto cadastrado",
+              style: TextStyle(color: Colors.grey)),
         ],
       ),
     );
