@@ -14,6 +14,8 @@ class EstatisticasPage extends StatefulWidget {
 class _EstatisticasPageState extends State<EstatisticasPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
+  DateTime _periodoSelecionado = DateTime(2025, 5, 1);
+  bool _periodoPorDia = false;
 
   // ─── Paleta ───────────────────────────────────────────────────────────────
   static const _purple = Color(0xFF534AB7);
@@ -43,14 +45,51 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   }
 
   // ─── Cálculos ─────────────────────────────────────────────────────────────
+  static const _meses = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+  ];
+
+  String get _periodoLabel {
+    final mes = _meses[_periodoSelecionado.month - 1];
+    if (_periodoPorDia) {
+      return '${_periodoSelecionado.day} $mes ${_periodoSelecionado.year}';
+    }
+    return '$mes ${_periodoSelecionado.year}';
+  }
+
+  double get _periodoFator {
+    if (_periodoPorDia) {
+      final variacao = 0.72 + (_periodoSelecionado.day % 8) * 0.045;
+      return (variacao / 30).clamp(0.01, 0.08);
+    }
+
+    final distanciaMeses =
+        ((_periodoSelecionado.year - 2025) * 12 + _periodoSelecionado.month - 5)
+            .abs();
+    return (1 - distanciaMeses * 0.08).clamp(0.35, 1.0);
+  }
+
   double get receitaTotal =>
-      widget.produtos.fold(0, (s, p) => s + p.precoVenda * p.vendidos);
+      widget.produtos.fold(0.0, (s, p) => s + p.precoVenda * p.vendidos) *
+      _periodoFator;
 
   double get despesaTotal =>
-      widget.produtos.fold(0, (s, p) => s + p.precoCompra * p.vendidos);
+      widget.produtos.fold(0.0, (s, p) => s + p.precoCompra * p.vendidos) *
+      _periodoFator;
 
   double get lucroTotal =>
-      widget.produtos.fold(0, (s, p) => s + p.lucroTotal);
+      widget.produtos.fold(0.0, (s, p) => s + p.lucroTotal) * _periodoFator;
 
   double get margemPct =>
       receitaTotal == 0 ? 0 : (lucroTotal / receitaTotal) * 100;
@@ -58,7 +97,8 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   Map<String, double> get despesasPorCategoria {
     final m = <String, double>{};
     for (var p in widget.produtos) {
-      m[p.categoria] = (m[p.categoria] ?? 0) + p.precoCompra * p.vendidos;
+      m[p.categoria] =
+          (m[p.categoria] ?? 0) + p.precoCompra * p.vendidos * _periodoFator;
     }
     return m;
   }
@@ -66,7 +106,7 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   Map<String, double> get receitasPorProduto {
     final m = <String, double>{};
     for (var p in widget.produtos) {
-      m[p.nome] = (m[p.nome] ?? 0) + p.precoVenda * p.vendidos;
+      m[p.nome] = (m[p.nome] ?? 0) + p.precoVenda * p.vendidos * _periodoFator;
     }
     return m;
   }
@@ -74,7 +114,7 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   Map<String, int> get produtosVendidos {
     final m = <String, int>{};
     for (var p in widget.produtos) {
-      m[p.nome] = (m[p.nome] ?? 0) + p.vendidos;
+      m[p.nome] = (m[p.nome] ?? 0) + (p.vendidos * _periodoFator).round();
     }
     return m;
   }
@@ -89,21 +129,34 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   int get healthScore {
     int score = 0;
     // Margem: excelente ≥50%, boa ≥30%, fraca <30%
-    if (margemPct >= 50) score += 35;
-    else if (margemPct >= 30) score += 20;
-    else score += 5;
+    if (margemPct >= 50) {
+      score += 35;
+    } else if (margemPct >= 30) {
+      score += 20;
+    } else {
+      score += 5;
+    }
     // Lucro positivo
     if (lucroTotal > 0) score += 25;
     // Diversificação: ≥3 produtos = ótimo, 2 = médio, 1 = fraco
     final np = widget.produtos.length;
-    if (np >= 3) score += 25;
-    else if (np == 2) score += 15;
-    else score += 5;
+    if (np >= 3) {
+      score += 25;
+    } else if (np == 2) {
+      score += 15;
+    } else {
+      score += 5;
+    }
     // Carga tributária (impostos / despesa): <20% ok, <30% médio, ≥30% ruim
-    final cargaTrib = despesaTotal == 0 ? 0 : (despesaTotal * 0.25) / despesaTotal;
-    if (cargaTrib < 0.20) score += 15;
-    else if (cargaTrib < 0.30) score += 8;
-    else score += 2;
+    final cargaTrib =
+        despesaTotal == 0 ? 0 : (despesaTotal * 0.25) / despesaTotal;
+    if (cargaTrib < 0.20) {
+      score += 15;
+    } else if (cargaTrib < 0.30) {
+      score += 8;
+    } else {
+      score += 2;
+    }
     return score.clamp(0, 100);
   }
 
@@ -159,21 +212,233 @@ class _EstatisticasPageState extends State<EstatisticasPage>
       foregroundColor: Colors.black87,
       elevation: 0,
       actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: _purpleLight,
-            borderRadius: BorderRadius.circular(20),
+        GestureDetector(
+          onTap: _abrirSeletorPeriodo,
+          child: Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _purpleLight,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_periodoLabel,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: _purple)),
+                const SizedBox(width: 4),
+                const Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 16, color: _purple),
+              ],
+            ),
           ),
-          child: const Text('Maio 2025',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: _purple)),
         ),
       ],
     );
+  }
+
+  Future<void> _abrirSeletorPeriodo() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Escolher período',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                _periodoOpcao(
+                  icon: Icons.calendar_view_month_rounded,
+                  title: 'Mês completo',
+                  subtitle: 'Ver estatísticas consolidadas do mês',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _selecionarMes();
+                  },
+                ),
+                const SizedBox(height: 8),
+                _periodoOpcao(
+                  icon: Icons.today_rounded,
+                  title: 'Dia específico',
+                  subtitle: 'Ver estatísticas detalhadas por dia',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _selecionarDia();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _periodoOpcao({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _purpleLight),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _purpleLight,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: _purple, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: const TextStyle(fontSize: 11, color: _grey)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: _grey),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selecionarDia() async {
+    final data = await showDatePicker(
+      context: context,
+      initialDate: _periodoSelecionado,
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: DateTime(2035, 12, 31),
+      helpText: 'Escolha o dia',
+      cancelText: 'Cancelar',
+      confirmText: 'Aplicar',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: _purple,
+                  onPrimary: Colors.white,
+                ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (data == null) return;
+    setState(() {
+      _periodoSelecionado = data;
+      _periodoPorDia = true;
+    });
+  }
+
+  Future<void> _selecionarMes() async {
+    var ano = _periodoSelecionado.year;
+    final selecionado = await showDialog<DateTime>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Escolha o mês'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          onPressed: () => setDialogState(() => ano--),
+                          icon: const Icon(Icons.chevron_left_rounded),
+                        ),
+                        Text('$ano',
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        IconButton(
+                          onPressed: () => setDialogState(() => ano++),
+                          icon: const Icon(Icons.chevron_right_rounded),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      itemCount: 12,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 2.4,
+                      ),
+                      itemBuilder: (context, index) {
+                        final mes = index + 1;
+                        final ativo = !_periodoPorDia &&
+                            _periodoSelecionado.year == ano &&
+                            _periodoSelecionado.month == mes;
+                        return OutlinedButton(
+                          onPressed: () =>
+                              Navigator.pop(context, DateTime(ano, mes, 1)),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: ativo ? _purple : Colors.white,
+                            foregroundColor: ativo ? Colors.white : _purple,
+                            side: BorderSide(
+                                color: ativo ? _purple : _purpleLight),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(_meses[index].substring(0, 3)),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selecionado == null) return;
+    setState(() {
+      _periodoSelecionado = selecionado;
+      _periodoPorDia = false;
+    });
   }
 
   // ─── TabBar ───────────────────────────────────────────────────────────────
@@ -284,11 +549,11 @@ class _EstatisticasPageState extends State<EstatisticasPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.trending_up_rounded, size: 14, color: Colors.white70),
+            const Icon(Icons.trending_up_rounded,
+                size: 14, color: Colors.white70),
             const SizedBox(height: 4),
             Text(label,
-                style:
-                    const TextStyle(fontSize: 10, color: Colors.white70)),
+                style: const TextStyle(fontSize: 10, color: Colors.white70)),
             Text(value,
                 style: const TextStyle(
                     fontSize: 13,
@@ -536,8 +801,7 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                                 fontWeight: FontWeight.bold,
                                 color: _red)),
                         Text('${pct.toStringAsFixed(1)}%',
-                            style:
-                                const TextStyle(fontSize: 10, color: _grey)),
+                            style: const TextStyle(fontSize: 10, color: _grey)),
                       ],
                     ),
                   ],
@@ -576,12 +840,10 @@ class _EstatisticasPageState extends State<EstatisticasPage>
     final nomes = receitasPorProduto.keys.toList();
     if (nomes.isEmpty) return const Text('Sem dados');
 
-    final maxY = nomes
-            .map((n) {
-              final receita = receitasPorProduto[n] ?? 0;
-              return receita * 1.2;
-            })
-            .reduce((a, b) => a > b ? a : b);
+    final maxY = nomes.map((n) {
+      final receita = receitasPorProduto[n] ?? 0;
+      return receita * 1.2;
+    }).reduce((a, b) => a > b ? a : b);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -679,10 +941,10 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   }
 
   Widget _produtoRow(String nome, int vendidos) {
-    final p = widget.produtos.firstWhere((e) => e.nome == nome,
-        orElse: () => widget.produtos.first);
+    final p = widget.produtos
+        .firstWhere((e) => e.nome == nome, orElse: () => widget.produtos.first);
     final receita = p.precoVenda * vendidos;
-    final lucro = p.lucroTotal;
+    final lucro = p.lucroTotal * _periodoFator;
     final margem = receita == 0 ? 0.0 : (lucro / receita * 100);
 
     return Container(
@@ -734,8 +996,7 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                           color: _green,
                           fontSize: 14)),
                   Text('Lucro R\$ ${lucro.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                          fontSize: 11, color: _purple)),
+                      style: const TextStyle(fontSize: 11, color: _purple)),
                 ],
               ),
             ],
@@ -754,8 +1015,11 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                     value: (margem / 100).clamp(0.0, 1.0),
                     minHeight: 6,
                     backgroundColor: Colors.grey.withOpacity(0.12),
-                    valueColor: AlwaysStoppedAnimation(
-                        margem >= 50 ? _greenMid : margem >= 30 ? _amberMid : _redMid),
+                    valueColor: AlwaysStoppedAnimation(margem >= 50
+                        ? _greenMid
+                        : margem >= 30
+                            ? _amberMid
+                            : _redMid),
                   ),
                 ),
               ),
@@ -797,8 +1061,7 @@ class _EstatisticasPageState extends State<EstatisticasPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(r[0],
-                    style: const TextStyle(fontSize: 11, color: _grey)),
+                Text(r[0], style: const TextStyle(fontSize: 11, color: _grey)),
                 Text(r[1],
                     style: const TextStyle(
                         fontSize: 11, fontWeight: FontWeight.bold)),
@@ -911,8 +1174,8 @@ class _EstatisticasPageState extends State<EstatisticasPage>
               _kpiMini('Alertas', '${alertas.length}',
                   Icons.warning_amber_rounded, _amberLight, _amber),
               const SizedBox(width: 8),
-              _kpiMini('Positivos', '${positivos.length}',
-                  Icons.check_rounded, _greenLight, _green),
+              _kpiMini('Positivos', '${positivos.length}', Icons.check_rounded,
+                  _greenLight, _green),
             ],
           ),
           const SizedBox(height: 16),
@@ -946,8 +1209,7 @@ class _EstatisticasPageState extends State<EstatisticasPage>
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-                color: a.borderColor,
-                borderRadius: BorderRadius.circular(9)),
+                color: a.borderColor, borderRadius: BorderRadius.circular(9)),
             child: Icon(a.icon, size: 18, color: a.textColor),
           ),
           const SizedBox(width: 12),
@@ -962,8 +1224,10 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                         color: a.textColor)),
                 const SizedBox(height: 4),
                 Text(a.desc,
-                    style:
-                        TextStyle(fontSize: 12, color: a.textColor.withOpacity(0.8), height: 1.4)),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: a.textColor.withOpacity(0.8),
+                        height: 1.4)),
               ],
             ),
           ),
@@ -1032,29 +1296,38 @@ class _EstatisticasPageState extends State<EstatisticasPage>
               Row(
                 children: [
                   SizedBox(
-                    width: 90,
-                    height: 90,
+                    width: 104,
+                    height: 104,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        CircularProgressIndicator(
-                          value: score / 100,
-                          strokeWidth: 10,
-                          backgroundColor: Colors.grey.withOpacity(0.12),
-                          valueColor: AlwaysStoppedAnimation(color),
-                          strokeCap: StrokeCap.round,
+                        CustomPaint(
+                          size: const Size.square(104),
+                          painter: _HealthScorePainter(
+                            value: score / 100,
+                            color: color,
+                            bgColor: Colors.grey.withOpacity(0.12),
+                            strokeWidth: 8,
+                          ),
+                        ),
+                        Container(
+                          width: 62,
+                          height: 62,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text('$score',
                                 style: TextStyle(
-                                    fontSize: 22,
+                                    fontSize: 21,
                                     fontWeight: FontWeight.bold,
                                     color: color)),
                             const Text('score',
-                                style: TextStyle(
-                                    fontSize: 10, color: _grey)),
+                                style: TextStyle(fontSize: 10, color: _grey)),
                           ],
                         ),
                       ],
@@ -1067,8 +1340,25 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                       children: [
                         Text(label,
                             style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold)),
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _purpleLight,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _periodoPorDia
+                                ? 'Detalhe do dia: $_periodoLabel'
+                                : 'Período mensal: $_periodoLabel',
+                            style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: _purple),
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         Text(
                           lucroTotal > 0
@@ -1091,8 +1381,7 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                              color: ind.color,
-                              shape: BoxShape.circle),
+                              color: ind.color, shape: BoxShape.circle),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -1190,8 +1479,8 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                   color: _purple,
                   barWidth: 2.5,
                   dotData: const FlDotData(show: false),
-                  belowBarData: BarAreaData(
-                      show: true, color: _purple.withOpacity(0.07)),
+                  belowBarData:
+                      BarAreaData(show: true, color: _purple.withOpacity(0.07)),
                 ),
                 LineChartBarData(
                   spots: lucros,
@@ -1265,8 +1554,7 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                   ),
                   const SizedBox(width: 5),
                   Text(item.label,
-                      style:
-                          const TextStyle(fontSize: 11, color: _grey)),
+                      style: const TextStyle(fontSize: 11, color: _grey)),
                 ],
               ))
           .toList(),
@@ -1304,4 +1592,54 @@ class _Indicador {
   final String grade;
   final Color color;
   _Indicador(this.label, this.grade, this.color);
+}
+
+class _HealthScorePainter extends CustomPainter {
+  final double value;
+  final Color color;
+  final Color bgColor;
+  final double strokeWidth;
+
+  _HealthScorePainter({
+    required this.value,
+    required this.color,
+    required this.bgColor,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - strokeWidth) / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = bgColor
+        ..strokeWidth = strokeWidth
+        ..style = PaintingStyle.stroke,
+    );
+
+    canvas.drawArc(
+      rect,
+      -1.5708,
+      6.2832 * value.clamp(0, 1),
+      false,
+      Paint()
+        ..color = color
+        ..strokeWidth = strokeWidth
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HealthScorePainter oldDelegate) {
+    return oldDelegate.value != value ||
+        oldDelegate.color != color ||
+        oldDelegate.bgColor != bgColor ||
+        oldDelegate.strokeWidth != strokeWidth;
+  }
 }

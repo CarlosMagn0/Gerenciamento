@@ -692,7 +692,7 @@ class _DetalhesProdutoPageState extends State<DetalhesProdutoPage>
         children: [
           Row(children: [
             SizedBox(
-              width: 72, height: 72,
+              width: 90, height: 90,
               child: CustomPaint(
                 painter: _ScoreRingPainter(
                   value: _healthScore / 100,
