@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../models/produto.dart';
+import '../models/venda.dart';
 
 class EstatisticasPage extends StatefulWidget {
   final List<Produto> produtos;
@@ -14,7 +16,7 @@ class EstatisticasPage extends StatefulWidget {
 class _EstatisticasPageState extends State<EstatisticasPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
-  DateTime _periodoSelecionado = DateTime(2025, 5, 1);
+  DateTime _periodoSelecionado = DateTime.now();
   bool _periodoPorDia = false;
 
   // ─── Paleta ───────────────────────────────────────────────────────────────
@@ -68,53 +70,75 @@ class _EstatisticasPageState extends State<EstatisticasPage>
     return '$mes ${_periodoSelecionado.year}';
   }
 
-  double get _periodoFator {
-    if (_periodoPorDia) {
-      final variacao = 0.72 + (_periodoSelecionado.day % 8) * 0.045;
-      return (variacao / 30).clamp(0.01, 0.08);
-    }
-
-    final distanciaMeses =
-        ((_periodoSelecionado.year - 2025) * 12 + _periodoSelecionado.month - 5)
-            .abs();
-    return (1 - distanciaMeses * 0.08).clamp(0.35, 1.0);
+  DateTime get _hoje {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
   }
 
+  bool _mesFuturo(int ano, int mes) {
+    final atual = DateTime(_hoje.year, _hoje.month, 1);
+    return DateTime(ano, mes, 1).isAfter(atual);
+  }
+
+  bool _mesmaData(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  List<Venda> get _vendasPeriodo {
+    final vendas = Hive.box<Venda>('vendasBox').values;
+    return vendas.where((venda) {
+      if (_periodoPorDia) {
+        return _mesmaData(venda.data, _periodoSelecionado);
+      }
+      return venda.data.year == _periodoSelecionado.year &&
+          venda.data.month == _periodoSelecionado.month;
+    }).toList();
+  }
+
+  bool get _semVendasPeriodo => _vendasPeriodo.isEmpty;
+
   double get receitaTotal =>
-      widget.produtos.fold(0.0, (s, p) => s + p.precoVenda * p.vendidos) *
-      _periodoFator;
+      _vendasPeriodo.fold(0.0, (s, venda) => s + venda.receita);
 
   double get despesaTotal =>
-      widget.produtos.fold(0.0, (s, p) => s + p.precoCompra * p.vendidos) *
-      _periodoFator;
+      _vendasPeriodo.fold(0.0, (s, venda) => s + venda.despesa);
 
   double get lucroTotal =>
-      widget.produtos.fold(0.0, (s, p) => s + p.lucroTotal) * _periodoFator;
+      _vendasPeriodo.fold(0.0, (s, venda) => s + venda.lucro);
 
   double get margemPct =>
       receitaTotal == 0 ? 0 : (lucroTotal / receitaTotal) * 100;
 
   Map<String, double> get despesasPorCategoria {
     final m = <String, double>{};
-    for (var p in widget.produtos) {
-      m[p.categoria] =
-          (m[p.categoria] ?? 0) + p.precoCompra * p.vendidos * _periodoFator;
+    for (var venda in _vendasPeriodo) {
+      m[venda.categoria] = (m[venda.categoria] ?? 0) + venda.despesa;
     }
     return m;
   }
 
   Map<String, double> get receitasPorProduto {
     final m = <String, double>{};
-    for (var p in widget.produtos) {
-      m[p.nome] = (m[p.nome] ?? 0) + p.precoVenda * p.vendidos * _periodoFator;
+    for (var venda in _vendasPeriodo) {
+      m[venda.produtoNome] =
+          (m[venda.produtoNome] ?? 0) + venda.receita;
     }
     return m;
   }
 
   Map<String, int> get produtosVendidos {
     final m = <String, int>{};
-    for (var p in widget.produtos) {
-      m[p.nome] = (m[p.nome] ?? 0) + (p.vendidos * _periodoFator).round();
+    for (var venda in _vendasPeriodo) {
+      m[venda.produtoNome] =
+          (m[venda.produtoNome] ?? 0) + venda.quantidade;
+    }
+    return m;
+  }
+
+  Map<String, double> get lucrosPorProduto {
+    final m = <String, double>{};
+    for (var venda in _vendasPeriodo) {
+      m[venda.produtoNome] = (m[venda.produtoNome] ?? 0) + venda.lucro;
     }
     return m;
   }
@@ -179,26 +203,31 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   // ─── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          _buildTabBar(),
-          _buildKpiStrip(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabs,
-              children: [
-                _tabVisaoGeral(),
-                _tabProdutos(),
-                _tabAlertas(),
-                _tabSaude(),
-              ],
-            ),
+    return ValueListenableBuilder(
+      valueListenable: Hive.box<Venda>('vendasBox').listenable(),
+      builder: (context, Box<Venda> box, _) {
+        return Scaffold(
+          backgroundColor: _bg,
+          appBar: _buildAppBar(),
+          body: Column(
+            children: [
+              _buildTabBar(),
+              _buildKpiStrip(),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabs,
+                  children: [
+                    _tabVisaoGeral(),
+                    _tabProdutos(),
+                    _tabAlertas(),
+                    _tabSaude(),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -335,11 +364,15 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   }
 
   Future<void> _selecionarDia() async {
+    final hoje = _hoje;
+    final initialDate = _periodoSelecionado.isAfter(hoje)
+        ? hoje
+        : _periodoSelecionado;
     final data = await showDatePicker(
       context: context,
-      initialDate: _periodoSelecionado,
+      initialDate: initialDate,
       firstDate: DateTime(2020, 1, 1),
-      lastDate: DateTime(2035, 12, 31),
+      lastDate: hoje,
       helpText: 'Escolha o dia',
       cancelText: 'Cancelar',
       confirmText: 'Aplicar',
@@ -364,7 +397,10 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   }
 
   Future<void> _selecionarMes() async {
-    var ano = _periodoSelecionado.year;
+    final hoje = _hoje;
+    var ano = _periodoSelecionado.isAfter(hoje)
+        ? hoje.year
+        : _periodoSelecionado.year;
     final selecionado = await showDialog<DateTime>(
       context: context,
       builder: (context) {
@@ -388,7 +424,9 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                             style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.bold)),
                         IconButton(
-                          onPressed: () => setDialogState(() => ano++),
+                          onPressed: ano < hoje.year
+                              ? () => setDialogState(() => ano++)
+                              : null,
                           icon: const Icon(Icons.chevron_right_rounded),
                         ),
                       ],
@@ -406,15 +444,24 @@ class _EstatisticasPageState extends State<EstatisticasPage>
                       ),
                       itemBuilder: (context, index) {
                         final mes = index + 1;
+                        final futuro = _mesFuturo(ano, mes);
                         final ativo = !_periodoPorDia &&
                             _periodoSelecionado.year == ano &&
                             _periodoSelecionado.month == mes;
                         return OutlinedButton(
-                          onPressed: () =>
-                              Navigator.pop(context, DateTime(ano, mes, 1)),
+                          onPressed: futuro
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  DateTime(ano, mes, 1),
+                                ),
                           style: OutlinedButton.styleFrom(
                             backgroundColor: ativo ? _purple : Colors.white,
-                            foregroundColor: ativo ? Colors.white : _purple,
+                            foregroundColor: futuro
+                                ? _grey
+                                : ativo
+                                    ? Colors.white
+                                    : _purple,
                             side: BorderSide(
                                 color: ativo ? _purple : _purpleLight),
                             shape: RoundedRectangleBorder(
@@ -571,11 +618,18 @@ class _EstatisticasPageState extends State<EstatisticasPage>
   // ABA 1 – VISÃO GERAL
   // ══════════════════════════════════════════════════════════════════════════
   Widget _tabVisaoGeral() {
+    if (_semVendasPeriodo) {
+      return _emptyPeriodo();
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _sectionLabel('Resumo estratégico'),
+          _card(_strategicOverview()),
+          const SizedBox(height: 14),
           _sectionLabel('Composição do resultado'),
           _card(_waterfallChart()),
           const SizedBox(height: 14),
@@ -586,6 +640,223 @@ class _EstatisticasPageState extends State<EstatisticasPage>
           _card(_donutDespesas()),
         ],
       ),
+    );
+  }
+
+  Widget _emptyPeriodo() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: _purpleLight,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(Icons.event_busy_rounded,
+                  color: _purple, size: 30),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Sem vendas neste período',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E1B4B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _periodoPorDia
+                  ? 'Nenhuma venda foi registrada em $_periodoLabel.'
+                  : 'Nenhuma venda foi registrada em $_periodoLabel.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: _grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _strategicOverview() {
+    final vendidosTotal = produtosVendidos.values.fold(0, (a, b) => a + b);
+    final ticketMedio = vendidosTotal == 0 ? 0.0 : receitaTotal / vendidosTotal;
+    final metaReceita = (despesaTotal * 1.35).clamp(500.0, double.infinity);
+    final progressoMeta =
+        metaReceita == 0 ? 0.0 : (receitaTotal / metaReceita).clamp(0.0, 1.0);
+    final eficiencia =
+        receitaTotal == 0 ? 0.0 : (lucroTotal / receitaTotal).clamp(-1.0, 1.0);
+    final runwayDias = despesaTotal <= 0
+        ? 0
+        : ((lucroTotal.abs() + receitaTotal) / (despesaTotal / 30)).round();
+    final recomendacao = _recomendacaoFinanceira(progressoMeta, eficiencia);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          _strategyMetric(
+            'Meta',
+            '${(progressoMeta * 100).toStringAsFixed(0)}%',
+            Icons.flag_rounded,
+            progressoMeta >= 0.85 ? _greenMid : _purple,
+            progressoMeta >= 0.85 ? _greenLight : _purpleLight,
+          ),
+          const SizedBox(width: 8),
+          _strategyMetric(
+            'Ticket médio',
+            'R\$ ${ticketMedio.toStringAsFixed(2)}',
+            Icons.payments_rounded,
+            _amberMid,
+            _amberLight,
+          ),
+          const SizedBox(width: 8),
+          _strategyMetric(
+            'Runway',
+            '${runwayDias.clamp(0, 999)}d',
+            Icons.speed_rounded,
+            lucroTotal >= 0 ? _greenMid : _redMid,
+            lucroTotal >= 0 ? _greenLight : _redLight,
+          ),
+        ]),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _bg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE8E6F5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Receita alvo',
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text(
+                      'R\$ ${receitaTotal.toStringAsFixed(0)} / R\$ ${metaReceita.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _purple)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: progressoMeta,
+                  minHeight: 8,
+                  backgroundColor: Colors.white,
+                  valueColor: AlwaysStoppedAnimation(
+                      progressoMeta >= 0.85 ? _greenMid : _purple),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: recomendacao.color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(recomendacao.icon,
+                      size: 16, color: recomendacao.color),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(recomendacao.title,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: recomendacao.color)),
+                      const SizedBox(height: 2),
+                      Text(recomendacao.desc,
+                          style: const TextStyle(
+                              fontSize: 11, color: _grey, height: 1.35)),
+                    ],
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _strategyMetric(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    Color bg,
+  ) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(height: 6),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.bold, color: color),
+                overflow: TextOverflow.ellipsis),
+            Text(label, style: const TextStyle(fontSize: 10, color: _grey)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _Insight _recomendacaoFinanceira(double progressoMeta, double eficiencia) {
+    if (lucroTotal < 0) {
+      return _Insight(
+        Icons.warning_rounded,
+        'Cortar perda primeiro',
+        'O resultado está negativo. Revise preços, custos de compra e produtos com margem baixa.',
+        _redMid,
+      );
+    }
+    if (progressoMeta < 0.65) {
+      return _Insight(
+        Icons.campaign_rounded,
+        'Acelerar vendas',
+        'A meta ainda está distante. Priorize produtos campeões e faça uma ação comercial curta.',
+        _amberMid,
+      );
+    }
+    if (eficiencia >= 0.45) {
+      return _Insight(
+        Icons.rocket_launch_rounded,
+        'Escalar com controle',
+        'A margem está forte. Reponha os produtos de maior lucro e mantenha estoque mínimo.',
+        _greenMid,
+      );
+    }
+    return _Insight(
+      Icons.tune_rounded,
+      'Ajustar margem',
+      'A operação vende, mas pode lucrar mais. Revise preço e custo dos itens mais vendidos.',
+      _purple,
     );
   }
 
@@ -940,112 +1211,112 @@ class _EstatisticasPageState extends State<EstatisticasPage>
     );
   }
 
-  Widget _produtoRow(String nome, int vendidos) {
-    final p = widget.produtos
-        .firstWhere((e) => e.nome == nome, orElse: () => widget.produtos.first);
-    final receita = p.precoVenda * vendidos;
-    final lucro = p.lucroTotal * _periodoFator;
-    final margem = receita == 0 ? 0.0 : (lucro / receita * 100);
+Widget _produtoRow(String nome, int vendidos) {
+  final p = widget.produtos
+      .firstWhere((e) => e.nome == nome, orElse: () => widget.produtos.first);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 3))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: _purpleLight,
-                child: Text(nome[0].toUpperCase(),
-                    style: const TextStyle(
-                        color: _purple,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(nome,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text('$vendidos vendido(s)',
-                        style: const TextStyle(fontSize: 11, color: _grey)),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+  // ✅ Usa o lucro real do período (calculado de _vendasPeriodo)
+  final receita = receitasPorProduto[nome] ?? 0.0;
+  final lucro = lucrosPorProduto[nome] ?? 0.0;
+  final margem = receita == 0 ? 0.0 : (lucro / receita * 100);
+
+  return Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      boxShadow: [
+        BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 3))
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: _purpleLight,
+              child: Text(nome[0].toUpperCase(),
+                  style: const TextStyle(
+                      color: _purple,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('R\$ ${receita.toStringAsFixed(2)}',
+                  Text(nome,
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _green,
-                          fontSize: 14)),
-                  Text('Lucro R\$ ${lucro.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 11, color: _purple)),
+                          fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text('$vendidos vendido(s)',
+                      style: const TextStyle(fontSize: 11, color: _grey)),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Barra de margem inline
-          Row(
-            children: [
-              const Text('Margem:',
-                  style: TextStyle(fontSize: 11, color: _grey)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: (margem / 100).clamp(0.0, 1.0),
-                    minHeight: 6,
-                    backgroundColor: Colors.grey.withOpacity(0.12),
-                    valueColor: AlwaysStoppedAnimation(margem >= 50
-                        ? _greenMid
-                        : margem >= 30
-                            ? _amberMid
-                            : _redMid),
-                  ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('R\$ ${receita.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _green,
+                        fontSize: 14)),
+                Text('Lucro R\$ ${lucro.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 11, color: _purple)),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            const Text('Margem:',
+                style: TextStyle(fontSize: 11, color: _grey)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: (margem / 100).clamp(0.0, 1.0),
+                  minHeight: 6,
+                  backgroundColor: Colors.grey.withOpacity(0.12),
+                  valueColor: AlwaysStoppedAnimation(margem >= 50
+                      ? _greenMid
+                      : margem >= 30
+                          ? _amberMid
+                          : _redMid),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text('${margem.toStringAsFixed(0)}%',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: margem >= 50
-                          ? _green
-                          : margem >= 30
-                              ? _amber
-                              : _red)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Mini tabela
-          _miniTabela([
-            ['Preço venda', 'R\$ ${p.precoVenda.toStringAsFixed(2)}'],
-            ['Custo compra', 'R\$ ${p.precoCompra.toStringAsFixed(2)}'],
-            ['Margem bruta', 'R\$ ${lucro.toStringAsFixed(2)}'],
-          ]),
-        ],
-      ),
-    );
-  }
+            ),
+            const SizedBox(width: 8),
+            Text('${margem.toStringAsFixed(0)}%',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: margem >= 50
+                        ? _green
+                        : margem >= 30
+                            ? _amber
+                            : _red)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _miniTabela([
+          ['Preço venda', 'R\$ ${p.precoVenda.toStringAsFixed(2)}'],
+          ['Custo compra', 'R\$ ${p.precoCompra.toStringAsFixed(2)}'],
+          ['Lucro no período', 'R\$ ${lucro.toStringAsFixed(2)}'],
+        ]),
+      ],
+    ),
+  );
+}   
 
   Widget _miniTabela(List<List<String>> rows) {
     return Container(
@@ -1592,6 +1863,14 @@ class _Indicador {
   final String grade;
   final Color color;
   _Indicador(this.label, this.grade, this.color);
+}
+
+class _Insight {
+  final IconData icon;
+  final String title;
+  final String desc;
+  final Color color;
+  _Insight(this.icon, this.title, this.desc, this.color);
 }
 
 class _HealthScorePainter extends CustomPainter {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'models/produto.dart';
+import 'models/venda.dart';
 import 'screens/home_page.dart';
 
 Future<void> main() async {
@@ -14,9 +15,13 @@ Future<void> main() async {
   if (!Hive.isAdapterRegistered(0)) {
     Hive.registerAdapter(ProdutoAdapter());
   }
+  if (!Hive.isAdapterRegistered(1)) {
+    Hive.registerAdapter(VendaAdapter());
+  }
 
   // ABRE A BOX (SEM ISSO NADA É SALVO)
   await Hive.openBox<Produto>('produtosBox');
+  await Hive.openBox<Venda>('vendasBox');
 
   runApp(const GerenciadorApp());
 }

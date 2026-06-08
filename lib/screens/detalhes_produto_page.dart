@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/produto.dart';
+import '../venda_repository.dart';
 import 'novo_produto_page.dart';
 
 class DetalhesProdutoPage extends StatefulWidget {
@@ -39,6 +40,7 @@ class _DetalhesProdutoPageState extends State<DetalhesProdutoPage>
   static const _border      = Color(0xFFE4E2F5);
 
   late TabController _tabs;
+  final VendaRepository vendaRepo = VendaRepository();
   int _qtdVender = 1;
   bool _vendendo = false;
 
@@ -119,13 +121,15 @@ class _DetalhesProdutoPageState extends State<DetalhesProdutoPage>
 
     setState(() => _vendendo = true);
     await Future.delayed(const Duration(milliseconds: 300));
+    final quantidadeVendida = _qtdVender;
 
     setState(() {
-      p.estoque -= _qtdVender;
-      p.vendidos += _qtdVender;
+      p.estoque -= quantidadeVendida;
+      p.vendidos += quantidadeVendida;
       _vendendo = false;
       _qtdVender = 1;
     });
+    await vendaRepo.registrar(produto: p, quantidade: quantidadeVendida);
     widget.atualizar();
 
     if (p.estoque == 0) {
@@ -133,7 +137,7 @@ class _DetalhesProdutoPageState extends State<DetalhesProdutoPage>
     } else if (p.estoque <= 3) {
       _snack('⚠️ Estoque baixo: apenas ${p.estoque} unidade(s)', erro: false, cor: _amberMid);
     } else {
-      _snack('✅ ${_qtdVender} venda(s) registrada(s) com sucesso!');
+      _snack('✅ $quantidadeVendida venda(s) registrada(s) com sucesso!');
     }
   }
 
