@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "656987239974",
+    "project_id": "lumio-2512c",
+    "storage_bucket": "lumio-2512c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:656987239974:android:7a7f431ffd8d4e7d6058e7",
+        "android_client_info": {
+          "package_name": "com.carlos.lumio"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrSbUT4E2XIwLYfg3RbbSsBWBId0U1_N8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

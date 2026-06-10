@@ -5,21 +5,29 @@ import 'models/produto.dart';
 import 'models/venda.dart';
 import 'screens/home_page.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'screens/login_page.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializa o Hive no dispositivo
+  // Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Hive
   await Hive.initFlutter();
 
-  // Registra o Adapter do Produto
   if (!Hive.isAdapterRegistered(0)) {
     Hive.registerAdapter(ProdutoAdapter());
   }
+
   if (!Hive.isAdapterRegistered(1)) {
     Hive.registerAdapter(VendaAdapter());
   }
 
-  // ABRE A BOX (SEM ISSO NADA É SALVO)
   await Hive.openBox<Produto>('produtosBox');
   await Hive.openBox<Venda>('vendasBox');
 
@@ -38,7 +46,8 @@ class GerenciadorApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: Colors.indigo,
       ),
-      home: const HomePage(),
+      home: const LoginPage(),
     );
   }
 }
+

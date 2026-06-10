@@ -11,14 +11,19 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Cache local (Hive)
+  # Firebase
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.0
+  cloud_firestore: ^6.5.0
+  google_sign_in: ^7.1.1
+
+  # Hive
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
   # Gráficos
   fl_chart: ^0.69.2
 
-  # Ícones iOS
   cupertino_icons: ^1.0.8
 
 dev_dependencies:

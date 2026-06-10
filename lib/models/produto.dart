@@ -33,4 +33,26 @@ class Produto {
 
   double get lucroUnitario => precoVenda - precoCompra;
   double get lucroTotal => lucroUnitario * vendidos;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'nome': nome,
+      'categoria': categoria,
+      'precoCompra': precoCompra,
+      'precoVenda': precoVenda,
+      'estoque': estoque,
+      'vendidos': vendidos,
+    };
+  }
+
+  factory Produto.fromJson(Map<String, dynamic> json) {
+    return Produto(
+      nome: json['nome'],
+      categoria: json['categoria'],
+      precoCompra: (json['precoCompra'] as num).toDouble(),
+      precoVenda: (json['precoVenda'] as num).toDouble(),
+      estoque: json['estoque'] ?? 0,
+      vendidos: json['vendidos'] ?? 0,
+    );
+  }
 }

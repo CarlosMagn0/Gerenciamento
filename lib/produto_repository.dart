@@ -1,26 +1,42 @@
 import 'package:hive/hive.dart';
 import '../models/produto.dart';
+import '../services/firestore_service.dart';
 
 class ProdutoRepository {
-  // Box correta (mesmo nome do main.dart)
+  // Box do Hive
   final Box<Produto> _box = Hive.box<Produto>('produtosBox');
+
+  // Firestore
+  final FirestoreService _firestore = FirestoreService();
 
   /// Lista todos os produtos
   List<Produto> listar() {
     return _box.values.toList();
   }
 
-  /// Adiciona um novo produto
+  /// Adiciona produto
   Future<void> adicionar(Produto produto) async {
-    await _box.add(produto);
+    try {
+      print("SALVANDO HIVE");
+
+      await _box.add(produto);
+
+      print("SALVANDO FIRESTORE");
+
+      await _firestore.salvarProduto(produto);
+
+      print("FINALIZOU");
+    } catch (e) {
+      print("ERRO AO SALVAR PRODUTO: $e");
+    }
   }
 
-  /// Atualiza um produto pelo índice
+  /// Atualiza produto
   Future<void> atualizar(int index, Produto produto) async {
     await _box.putAt(index, produto);
   }
 
-  /// Remove um produto
+  /// Remove produto
   Future<void> remover(int index) async {
     await _box.deleteAt(index);
   }
