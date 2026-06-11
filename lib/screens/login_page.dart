@@ -7,14 +7,17 @@ import 'home_page.dart';
 // ─────────────────────────────────────────────
 //  PALETA  (Dark Ink  ·  Cobalt Violet  ·  Gold)
 // ─────────────────────────────────────────────
-const _kBg        = Color(0xFF0D0F14); // Deep Ink
-const _kSurface   = Color(0xFF13161D); // Dark surface
-const _kBorder    = Color(0xFF252A35); // Divisor fino
-const _kAccent    = Color(0xFF7C6FED); // Violeta cobalt
-const _kGold      = Color(0xFFC9A96E); // Ouro financeiro
-const _kTextPri   = Color(0xFFE8EAF0); // Branco suave
-const _kTextSec   = Color(0xFF8891A4); // Cinza médio
-const _kGoogleBg  = Color(0xFFF8F8F8); // Branco Google
+const _kBg        = Color(0xFFF5F6FA);
+const _kSurface   = Colors.white;
+const _kBorder    = Color(0xFFE5E7EB);
+
+const _kAccent    = Color(0xFF6A5AE0);
+const _kGold      = Color(0xFF6A5AE0);
+
+const _kTextPri   = Color(0xFF1F2937);
+const _kTextSec   = Color(0xFF6B7280);
+
+const _kGoogleBg  = Colors.white;
 
 // ─────────────────────────────────────────────
 //  LOGOTIPO GEOMÉTRICO — LumioMark
@@ -218,23 +221,23 @@ class _LoginPageState extends State<LoginPage> {
                           child: Center(
                             // Moldura quadrada com borda sutil
                             child: Container(
-                              width: 180,
-                              height: 180,
+                              width: 140,
+                              height: 140,
                               decoration: BoxDecoration(
-                                color: _kSurface,
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(
-                                  color: _kBorder,
-                                  width: 1.2,
-                                ),
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _kAccent.withOpacity(0.15),
+                                    blurRadius: 25,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
                               ),
-                            padding: const EdgeInsets.all(10),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image.asset(
-                                  'assets/iconn.png',
-                                  fit: BoxFit.contain,
-                                ),
+                              padding: const EdgeInsets.all(15),
+                              child: Image.asset(
+                                'assets/iconn.png',
+                                fit: BoxFit.contain,
                               ),
                             ),
                           ),

@@ -5,14 +5,17 @@ import 'login_page.dart';
 // ─────────────────────────────────────────────
 //  PALETA  (mesma da LoginPage — Dark Ink · Cobalt Violet · Gold)
 // ─────────────────────────────────────────────
-const _kBg       = Color(0xFF0D0F14);
-const _kSurface  = Color(0xFF13161D);
-const _kBorder   = Color(0xFF252A35);
-const _kAccent   = Color(0xFF7C6FED);
-const _kGold     = Color(0xFFC9A96E);
-const _kTextPri  = Color(0xFFE8EAF0);
-const _kTextSec  = Color(0xFF8891A4);
-const _kDanger   = Color(0xFFE05C5C);
+const _kBg       = Color(0xFFF5F6FA);
+const _kSurface  = Colors.white;
+const _kBorder   = Color(0xFFE5E7EB);
+
+const _kAccent   = Color(0xFF6A5AE0);
+const _kGold     = Color(0xFF6A5AE0);
+
+const _kTextPri  = Color(0xFF1F2937);
+const _kTextSec  = Color(0xFF6B7280);
+
+const _kDanger   = Color(0xFFE53935);
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -164,11 +167,24 @@ class ProfilePage extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: _kSurface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _kBorder, width: 1),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF6A5AE0),
+                  Color(0xFF7C6FED),
+                ],
               ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6A5AE0).withOpacity(.25),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
               child: Column(
                 children: [
                   // Avatar monograma com halo
@@ -177,67 +193,52 @@ class ProfilePage extends StatelessWidget {
                     children: [
                       // Halo externo
                       Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              _kAccent.withOpacity(0.18),
-                              Colors.transparent,
-                            ],
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border: Border.all(
+                              color: Colors.white24,
+                              width: 2,
+                            ),
                           ),
-                        ),
-                      ),
-                      // Avatar
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _kBg,
-                          border: Border.all(color: _kAccent.withOpacity(0.5), width: 1.5),
-                        ),
-                        // → Se o Google retornar photoURL, use:
-                        // backgroundImage: user?.photoURL != null
-                        //     ? NetworkImage(user!.photoURL!) : null
-                        child: Center(
-                          child: Text(
-                            inicial,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: _kAccent,
+                          child: Center(
+                            child: Text(
+                              inicial,
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF6A5AE0),
+                              ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
 
                   const SizedBox(height: 14),
 
                   // Nome
-                  Text(
+               Text(
                     nome,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: _kTextPri,
-                      letterSpacing: -0.3,
-                    ),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
+                ),
 
                   const SizedBox(height: 4),
 
                   // Email
                   Text(
-                    email,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: _kTextSec,
-                    ),
+                  email,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.white70,
                   ),
+                ),
 
                   const SizedBox(height: 20),
 
@@ -430,7 +431,7 @@ class ProfilePage extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: _kSurface,
+        color: const Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _kBorder, width: 1),
       ),
